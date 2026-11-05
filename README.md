@@ -11,7 +11,7 @@ Fast. Private. Works fully offline on Windows.
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Offline](https://img.shields.io/badge/data-stays%20on%20your%20PC-success)
 
-[**Download the latest version**](https://github.com/YOUR-USERNAME/FocusFlow/releases/latest)
+[**Download the latest version**](https://github.com/shibil62/FocusFlow/releases/latest)
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -31,7 +31,7 @@ FocusFlow keeps the two ideas separate:
 
 ## Download and install
 
-1. Go to the [**Releases** page](https://github.com/YOUR-USERNAME/FocusFlow/releases/latest).
+1. Go to the [**Releases** page](https://github.com/shibil62/FocusFlow/releases/latest).
 2. Download `FocusFlow-1.0.0.exe`.
 3. Double-click it and follow the installer. No Java needed, it is bundled.
 
@@ -125,7 +125,7 @@ Thresholds can be changed in Settings.
 You need **JDK 21** and **Maven**.
 
 ```bat
-git clone https://github.com/YOUR-USERNAME/FocusFlow.git
+git clone https://github.com/shibil62/FocusFlow.git
 cd FocusFlow
 run.bat
 ```
@@ -183,7 +183,7 @@ com.focusflow
 
 ## Contributing
 
-Bug reports and ideas are welcome. Please open an [issue](https://github.com/YOUR-USERNAME/FocusFlow/issues)
+Bug reports and ideas are welcome. Please open an [issue](https://github.com/shibil62/FocusFlow/issues)
 and include what you did, what you expected, and the file `%APPDATA%\FocusFlow\error.log` if it exists.
 
 ## Credits
