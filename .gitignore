@@ -1,0 +1,22 @@
+# Build output
+target/
+build/
+dist/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Never commit personal data or logs
+*.db
+*.db-wal
+*.db-shm
+error.log
