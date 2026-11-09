@@ -23,7 +23,14 @@ public final class Time {
 
     public static String time(LocalDateTime t) { return t.format(T12); }
     public static String time(LocalTime t) { return t.format(T12); }
-    public static String range(LocalDateTime a, LocalDateTime b) { return time(a) + " – " + time(b); }
+    /** "9:00 PM – 3:00 AM (+1 day)" when the range runs past midnight; ending exactly at 12:00 AM stays on the same day. */
+    public static String range(LocalDateTime a, LocalDateTime b) {
+        String r = time(a) + " – " + time(b);
+        long extra = java.time.temporal.ChronoUnit.DAYS.between(a.toLocalDate(), b.toLocalDate());
+        if (b.toLocalTime().equals(LocalTime.MIDNIGHT)) extra--;
+        if (extra > 0) r += extra == 1 ? " (+1 day)" : " (+" + extra + " days)";
+        return r;
+    }
     public static String dateShort(LocalDate d) { return d.format(D_SHORT); }
     public static String dateLong(LocalDate d) { return d.format(D_LONG); }
     public static String dateMed(LocalDate d) { return d.format(D_MED); }

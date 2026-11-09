@@ -12,6 +12,11 @@ import java.util.List;
  * Times are stored as epoch milliseconds. All-day tasks use start = midnight of the day and no end.
  */
 public class Task {
+    /** Colours offered for tasks (same family as the category colours). */
+    public static final String[] PALETTE = {
+            "#0A84FF", "#FF375F", "#30D158", "#FF9F0A", "#BF5AF2", "#40C8E0",
+            "#FFD60A", "#FF453A", "#5E5CE6", "#64D2FF", "#AC8E68", "#66D4CF"};
+
     public long id;
     public String title = "";
     public String description = "";
@@ -30,6 +35,8 @@ public class Task {
     public boolean archived;
     public Recurrence recurrence = Recurrence.NONE;
     public Long recurrenceParent;
+    /** Own colour as "#RRGGBB", or null (then the category colour, or a colour derived from the id, is used). */
+    public String color;
     public List<Subtask> subtasks = new ArrayList<>();
 
     public boolean isCompleted() { return status == Status.COMPLETED; }
@@ -46,15 +53,22 @@ public class Task {
     public void setEnd(LocalDateTime t) { end = Time.msOrNull(t); }
     public void setDeadline(LocalDateTime t) { deadline = Time.msOrNull(t); }
 
-    /** Last day this task is scheduled on. Only all-day tasks can span several days (end = last day). */
+    /**
+     * Last day this task is scheduled on. All-day tasks can span days (end = last day); timed tasks can run
+     * past midnight (e.g. 9 PM to 3 AM). A timed task that ends exactly at 12:00 AM ends on the previous day.
+     */
     public LocalDate lastDay() {
         LocalDate s = scheduledDate();
         if (s == null) return null;
-        if (allDay && end != null) {
-            LocalDate e = Time.dt(end).toLocalDate();
-            return e.isAfter(s) ? e : s;
+        if (end == null) return s;
+        LocalDateTime e = Time.dt(end);
+        if (allDay) {
+            LocalDate d = e.toLocalDate();
+            return d.isAfter(s) ? d : s;
         }
-        return s;
+        LocalDate d = e.toLocalDate();
+        if (e.toLocalTime().equals(java.time.LocalTime.MIDNIGHT)) d = d.minusDays(1);
+        return d.isAfter(s) ? d : s;
     }
 
     public boolean coversDay(LocalDate d) {
@@ -83,7 +97,7 @@ public class Task {
         t.start = start; t.end = end; t.allDay = allDay; t.deadline = deadline;
         t.estimatedMinutes = estimatedMinutes; t.completedAt = completedAt;
         t.createdAt = createdAt; t.updatedAt = updatedAt; t.archived = archived;
-        t.recurrence = recurrence; t.recurrenceParent = recurrenceParent;
+        t.recurrence = recurrence; t.recurrenceParent = recurrenceParent; t.color = color;
         for (Subtask s : subtasks) t.subtasks.add(s.copy());
         return t;
     }

@@ -14,9 +14,17 @@ import java.awt.geom.RoundRectangle2D;
 public final class TaskVisuals {
     private TaskVisuals() {}
 
+    /**
+     * The task's own colour; tasks saved before colours existed use their category colour, or a
+     * colour picked from the palette by id, so tasks are told apart on the calendar.
+     */
     public static Color base(Task t) {
+        if (t.color != null) {
+            try { return Color.decode(t.color); } catch (NumberFormatException ignored) { }
+        }
         Category c = AppContext.categories.byId(t.categoryId);
-        return c == null ? Theme.accent : c.awt();
+        if (c != null) return c.awt();
+        return Color.decode(Task.PALETTE[(int) Math.floorMod(t.id, (long) Task.PALETTE.length)]);
     }
 
     public static Color fill(Color base) { return Gfx.mix(Theme.surface, base, Theme.dark ? 0.32 : 0.20); }

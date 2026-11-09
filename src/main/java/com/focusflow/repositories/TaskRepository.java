@@ -13,13 +13,13 @@ import java.util.Map;
 public class TaskRepository {
     private static final String COLS = "id,title,description,notes,category_id,priority,status,scheduled_start,"
             + "scheduled_end,all_day,deadline,estimated_minutes,completed_at,created_at,updated_at,archived,"
-            + "recurrence,recurrence_parent";
+            + "recurrence,recurrence_parent,color";
     private static final String INSERT = "INSERT INTO tasks(title,description,notes,category_id,priority,status,"
             + "scheduled_start,scheduled_end,all_day,deadline,estimated_minutes,completed_at,created_at,updated_at,"
-            + "archived,recurrence,recurrence_parent) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            + "archived,recurrence,recurrence_parent,color) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     private static final String UPDATE = "UPDATE tasks SET title=?,description=?,notes=?,category_id=?,priority=?,"
             + "status=?,scheduled_start=?,scheduled_end=?,all_day=?,deadline=?,estimated_minutes=?,completed_at=?,"
-            + "created_at=?,updated_at=?,archived=?,recurrence=?,recurrence_parent=? WHERE id=?";
+            + "created_at=?,updated_at=?,archived=?,recurrence=?,recurrence_parent=?,color=? WHERE id=?";
 
     public List<Task> findAll() {
         return Database.run(c -> {
@@ -64,10 +64,22 @@ public class TaskRepository {
         Database.tx(c -> {
             try (PreparedStatement ps = c.prepareStatement(UPDATE)) {
                 bind(ps, t);
-                ps.setLong(18, t.id);
+                ps.setLong(19, t.id);
                 ps.executeUpdate();
             }
             saveSubtasks(c, t);
+            return null;
+        });
+    }
+
+    /** Changes only the colour column (used once for tasks that were saved before colours existed). */
+    public void updateColor(long id, String color) {
+        Database.run(c -> {
+            try (PreparedStatement ps = c.prepareStatement("UPDATE tasks SET color=? WHERE id=?")) {
+                ps.setString(1, color);
+                ps.setLong(2, id);
+                ps.executeUpdate();
+            }
             return null;
         });
     }
@@ -133,6 +145,7 @@ public class TaskRepository {
         ps.setInt(15, t.archived ? 1 : 0);
         ps.setString(16, t.recurrence.name());
         setNull(ps, 17, t.recurrenceParent);
+        if (t.color == null || t.color.isBlank()) ps.setNull(18, Types.VARCHAR); else ps.setString(18, t.color);
     }
 
     private static Task read(ResultSet rs) throws SQLException {
@@ -155,6 +168,7 @@ public class TaskRepository {
         t.archived = rs.getInt(16) != 0;
         t.recurrence = Recurrence.parse(rs.getString(17));
         t.recurrenceParent = nl(rs, 18);
+        t.color = rs.getString(19);
         return t;
     }
 

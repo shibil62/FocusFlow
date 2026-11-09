@@ -83,6 +83,10 @@ public class TaskRow extends JComponent {
             LocalDate last = task.lastDay();
             return (last.isAfter(d) ? Time.relativeDay(d) + " – " + Time.relativeDay(last) : Time.relativeDay(d)) + " · All day";
         }
+        LocalDate last = task.lastDay();
+        if (last != null && last.isAfter(d)) {
+            return Time.relativeDay(d) + ", " + Time.time(task.startDT()) + " – " + Time.relativeDay(last) + ", " + Time.time(task.endDT());
+        }
         return Time.relativeDay(d) + ", " + Time.range(task.startDT(), task.endDT());
     }
 

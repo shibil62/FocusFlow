@@ -29,7 +29,9 @@ public final class TaskDialog extends JPanel {
     private final JComboBox<Recurrence> recur = new JComboBox<>(Recurrence.values());
     private final Segmented prio;
     private final Toggle schedT, allDayT, dlT;
-    private final JSpinner sDate, sStart, sEnd, uDate, dDate, dTime, est;
+    private final JSpinner sDate, sStart, eDate, sEnd, uDate, dDate, dTime, est;
+    private LocalDateTime prevStart;
+    private boolean adjusting, endDateManual;
     private final JPanel subs = new JPanel();
     private final List<SubRow> subRows = new ArrayList<>();
     private final JTextField newSub = new JTextField();
@@ -58,13 +60,16 @@ public final class TaskDialog extends JPanel {
         LocalDateTime s = existing != null && existing.start != null ? existing.startDT() : defStart != null ? defStart : baseDate.atTime(9, 0);
         LocalDateTime e = existing != null && existing.end != null ? existing.endDT()
                 : defEnd != null ? defEnd : s.plusMinutes(AppContext.settings.getInt("calendar.defaultDuration", 60));
-        if (!e.toLocalDate().equals(s.toLocalDate())) e = s.toLocalDate().atTime(23, 59);
         boolean hasDl = existing != null && existing.deadline != null;
         LocalDateTime dl = hasDl ? existing.deadlineDT() : baseDate.atTime(18, 0);
 
         sDate = Pickers.date(s.toLocalDate());
         sStart = Pickers.time(s.toLocalTime());
+        eDate = Pickers.date(e.toLocalDate());
         sEnd = Pickers.time(e.toLocalTime());
+        prevStart = s;
+        // An end date that is not simply "same day" or "next day because the end time is earlier" was set on purpose.
+        endDateManual = !e.toLocalDate().equals(s.toLocalDate().plusDays(e.toLocalTime().isAfter(s.toLocalTime()) ? 0 : 1));
         uDate = Pickers.date(existing != null && existing.allDay && existing.end != null ? existing.endDT().toLocalDate() : s.toLocalDate());
         dDate = Pickers.date(dl.toLocalDate());
         dTime = Pickers.time(dl.toLocalTime());
@@ -185,12 +190,16 @@ public final class TaskDialog extends JPanel {
         addRow(field("Priority", prio), 12);
 
         addRow(switchRow("Schedule on calendar", "A work session you plan to do", schedT), 18);
-        JPanel sched = new JPanel(new GridLayout(1, 3, 10, 0));
+        JPanel sched = new JPanel(new GridLayout(1, 2, 10, 0));
         sched.setOpaque(false);
-        sched.add(field("Date", sDate));
-        sched.add(field("Start", sStart));
-        sched.add(field("End", sEnd));
+        sched.add(field("Start date", sDate));
+        sched.add(field("Start time", sStart));
         addRow(sched, 8);
+        JPanel schedEnd = new JPanel(new GridLayout(1, 2, 10, 0));
+        schedEnd.setOpaque(false);
+        schedEnd.add(field("End date (pick the next day for overnight tasks)", eDate));
+        schedEnd.add(field("End time", sEnd));
+        addRow(schedEnd, 8);
         addRow(switchRow("All day", "No specific time. Use \"Until\" for work that spans several days", allDayT), 8);
         addRow(field("Until (last day, optional)", uDate), 8);
 
@@ -212,7 +221,11 @@ public final class TaskDialog extends JPanel {
         addRow(field("Notes", box(notes)), 16);
 
         java.awt.event.ActionListener ch = e -> updateHint();
-        for (JSpinner sp : new JSpinner[]{sDate, sStart, sEnd, uDate, dDate, dTime, est}) sp.addChangeListener(e -> updateHint());
+        for (JSpinner sp : new JSpinner[]{sDate, sStart, eDate, sEnd, uDate, dDate, dTime, est}) sp.addChangeListener(e -> updateHint());
+        sDate.addChangeListener(e -> startChanged());
+        sStart.addChangeListener(e -> startChanged());
+        sEnd.addChangeListener(e -> endTimeChanged());
+        eDate.addChangeListener(e -> { if (!adjusting) endDateManual = true; });
         prio.setToolTipText("Higher priority raises the urgency score");
         GridBagConstraints f = new GridBagConstraints();
         f.gridy = 9999;
@@ -277,6 +290,7 @@ public final class TaskDialog extends JPanel {
         boolean sc = schedT.isOn(), ad = allDayT.isOn();
         sDate.setEnabled(sc);
         sStart.setEnabled(sc && !ad);
+        eDate.setEnabled(sc && !ad);
         sEnd.setEnabled(sc && !ad);
         uDate.setEnabled(sc && ad);
         allDayT.setEnabled(sc);
@@ -317,6 +331,40 @@ public final class TaskDialog extends JPanel {
         form.repaint();
     }
 
+    // ------------------------------------------------------- overnight handling
+
+    /** Start moved: the end moves with it, so the duration stays the same (and an overnight task stays overnight). */
+    private void startChanged() {
+        if (adjusting) return;
+        LocalDateTime now = Pickers.getDate(sDate).atTime(Pickers.getTime(sStart));
+        LocalDateTime end = Pickers.getDate(eDate).atTime(Pickers.getTime(sEnd)).plus(java.time.Duration.between(prevStart, now));
+        prevStart = now;
+        adjusting = true;
+        try {
+            Pickers.setDate(eDate, end.toLocalDate());
+            Pickers.setTime(sEnd, end.toLocalTime());
+        } finally {
+            adjusting = false;
+        }
+    }
+
+    /**
+     * End time edited: an end time at or before the start time means the task runs past midnight, so the end
+     * date becomes the next day (12:00 AM ends the day, 3:00 AM ends the next morning). Unless the end date was
+     * chosen by hand.
+     */
+    private void endTimeChanged() {
+        if (adjusting || endDateManual) return;
+        LocalDate d = Pickers.getDate(sDate);
+        boolean later = Pickers.getTime(sEnd).isAfter(Pickers.getTime(sStart));
+        adjusting = true;
+        try {
+            Pickers.setDate(eDate, later ? d : d.plusDays(1));
+        } finally {
+            adjusting = false;
+        }
+    }
+
     // -------------------------------------------------------------- save logic
 
     private Task build() {
@@ -339,7 +387,7 @@ public final class TaskDialog extends JPanel {
             } else {
                 t.allDay = false;
                 t.setStart(d.atTime(Pickers.getTime(sStart)));
-                t.setEnd(d.atTime(Pickers.getTime(sEnd)));
+                t.setEnd(Pickers.getDate(eDate).atTime(Pickers.getTime(sEnd)));
             }
         } else {
             t.start = null;

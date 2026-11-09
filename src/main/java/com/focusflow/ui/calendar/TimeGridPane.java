@@ -46,6 +46,10 @@ public class TimeGridPane extends JScrollPane {
         int col, lane, lanes = 1, startMin, endMin;
         Rectangle r = new Rectangle();
         boolean deadline;
+        /** True when the task also runs on the day before / after this column (it crosses midnight). */
+        boolean contBefore, contAfter;
+        /** Minutes between the task's real start and the start of this segment (0 unless contBefore). */
+        int segOffset;
     }
 
     @SuppressWarnings("unchecked")
@@ -88,13 +92,21 @@ public class TimeGridPane extends JScrollPane {
             LocalDate d = first.plusDays(c);
             List<Placed> day = new ArrayList<>();
             for (Task t : tasks) {
-                if (t.isTimed() && t.scheduledDate().equals(d)) {
+                if (t.isTimed() && t.coversDay(d)) {
+                    // A task that crosses midnight is drawn as one piece per day it touches.
+                    LocalDateTime dayStart = d.atStartOfDay(), dayEnd = dayStart.plusDays(1);
+                    LocalDateTime s = t.startDT(), e = t.endDT();
+                    LocalDateTime segS = s.isAfter(dayStart) ? s : dayStart;
+                    LocalDateTime segE = e.isBefore(dayEnd) ? e : dayEnd;
                     Placed p = new Placed();
                     p.t = t;
                     p.col = c;
-                    p.startMin = t.startDT().toLocalTime().toSecondOfDay() / 60;
-                    p.endMin = Math.max(p.startMin + 20, t.endDT().toLocalTime().toSecondOfDay() / 60);
-                    if (t.endDT().toLocalTime().equals(LocalTime.MIDNIGHT)) p.endMin = 1440;
+                    p.contBefore = s.isBefore(dayStart);
+                    p.contAfter = e.isAfter(dayEnd);
+                    p.segOffset = p.contBefore ? (int) java.time.Duration.between(s, dayStart).toMinutes() : 0;
+                    p.startMin = (int) java.time.Duration.between(dayStart, segS).toMinutes();
+                    p.endMin = (int) java.time.Duration.between(dayStart, segE).toMinutes();
+                    p.endMin = Math.max(p.endMin, Math.min(1440, p.startMin + 20));
                     day.add(p);
                 } else if (t.allDay && t.start != null && t.coversDay(d)) {
                     allDay[c].add(t);
@@ -299,6 +311,13 @@ public class TimeGridPane extends JScrollPane {
             return Math.max(0, Math.min(1440, v));
         }
 
+        /** Like minuteAt but not limited to the day, so a drag below midnight (or above 12 AM) reaches the next (or previous) day. */
+        private int rawMinuteAt(int y, boolean snap) {
+            double m = y * 60.0 / HOUR_H;
+            int v = snap ? (int) (Math.round(m / SNAP) * SNAP) : (int) Math.floor(m);
+            return Math.max(-1440, Math.min(2 * 1440 + 1440, v));
+        }
+
         private int colAt(int x) { return Math.max(0, Math.min(days - 1, (x - GUTTER) / colW(getWidth()))); }
 
         private LocalDateTime at(int col, int minute) { return first.plusDays(col).atStartOfDay().plusMinutes(minute); }
@@ -307,7 +326,7 @@ public class TimeGridPane extends JScrollPane {
             Placed h = hit(e.getPoint());
             if (h != hover) { hover = h; repaint(); }
             if (h == null) setCursor(Cursor.getDefaultCursor());
-            else if (!h.deadline && e.getY() > h.r.y + h.r.height - 7 && h.r.height > 24) setCursor(Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR));
+            else if (!h.deadline && !h.contAfter && e.getY() > h.r.y + h.r.height - 7 && h.r.height > 24) setCursor(Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR));
             else setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
 
@@ -321,7 +340,7 @@ public class TimeGridPane extends JScrollPane {
                 pressed = h;
                 if (h.deadline) { mode = Mode.PRESS_EVENT; return; }
                 grabMin = minuteAt(e.getY(), false) - h.startMin;
-                mode = e.getY() > h.r.y + h.r.height - 7 && h.r.height > 24 ? Mode.RESIZE : Mode.PRESS_EVENT;
+                mode = !h.contAfter && e.getY() > h.r.y + h.r.height - 7 && h.r.height > 24 ? Mode.RESIZE : Mode.PRESS_EVENT;
             } else if (e.getX() >= GUTTER) {
                 mode = Mode.CREATE;
                 int c = colAt(e.getX());
@@ -341,12 +360,13 @@ public class TimeGridPane extends JScrollPane {
                 case PRESS_EVENT, MOVE -> {
                     if (pressed.deadline) return;
                     mode = Mode.MOVE;
-                    int dur = pressed.endMin - pressed.startMin;
                     Task t = pressed.t;
-                    dur = (int) ((t.end - t.start) / 60000);
-                    int start = Math.max(0, Math.min(1440 - Math.min(dur, 1440), (int) (Math.round((minuteAt(e.getY(), false) - grabMin) / (double) SNAP) * SNAP)));
+                    int dur = (int) ((t.end - t.start) / 60000);
+                    // Where the dragged piece starts in the column under the mouse. Dragging past midnight
+                    // (or into another column in the week view) moves the task to the next or another day.
+                    int segStart = (int) (Math.round((rawMinuteAt(e.getY(), false) - grabMin) / (double) SNAP) * SNAP);
                     int c = colAt(e.getX());
-                    ghostStart = at(c, start);
+                    ghostStart = at(c, segStart).minusMinutes(pressed.segOffset);
                     ghostEnd = ghostStart.plusMinutes(dur);
                     ghostTask = t;
                     setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
@@ -354,17 +374,24 @@ public class TimeGridPane extends JScrollPane {
                 case RESIZE -> {
                     Task t = pressed.t;
                     ghostStart = t.startDT();
-                    int end = Math.max(pressed.startMin + SNAP, minuteAt(e.getY(), true));
-                    ghostEnd = ghostStart.toLocalDate().atStartOfDay().plusMinutes(Math.min(1440, end));
-                    if (end >= 1440) ghostEnd = ghostStart.toLocalDate().atTime(23, 59);
+                    int cm = colAt(e.getX());
+                    LocalDateTime end;
+                    if (cm > pressed.col) end = at(cm, minuteAt(e.getY(), true));
+                    else end = at(pressed.col, rawMinuteAt(e.getY(), true));
+                    if (end.isBefore(ghostStart.plusMinutes(SNAP))) end = ghostStart.plusMinutes(SNAP);
+                    ghostEnd = end;
                     ghostTask = t;
                 }
                 case CREATE -> {
                     int c = colAt(e.getX());
                     LocalDate day = ghostStart.toLocalDate();
+                    int startCol = (int) java.time.temporal.ChronoUnit.DAYS.between(first, day);
                     int sm = ghostStart.toLocalTime().toSecondOfDay() / 60;
-                    int em = Math.max(sm + SNAP, minuteAt(e.getY(), true));
-                    ghostEnd = day.atStartOfDay().plusMinutes(Math.min(em, 1439));
+                    LocalDateTime end;
+                    if (c > startCol) end = at(c, minuteAt(e.getY(), true));
+                    else end = day.atStartOfDay().plusMinutes(Math.max(sm + SNAP, rawMinuteAt(e.getY(), true)));
+                    if (end.isBefore(ghostStart.plusMinutes(SNAP))) end = ghostStart.plusMinutes(SNAP);
+                    ghostEnd = end;
                 }
                 default -> { }
             }
@@ -397,7 +424,6 @@ public class TimeGridPane extends JScrollPane {
                 case CREATE -> {
                     LocalDateTime s = ghostStart, en = ghostEnd;
                     if (!moved) en = s.plusMinutes(AppContext.settings.getInt(SettingsService.DEFAULT_DURATION, 60));
-                    if (!en.toLocalDate().equals(s.toLocalDate())) en = s.toLocalDate().atTime(23, 59);
                     ghostEnd = en;
                     TaskDialog.open(null, s, en, () -> { ghostStart = ghostEnd = null; repaint(); });
                 }
@@ -460,15 +486,17 @@ public class TimeGridPane extends JScrollPane {
             }
 
             if (ghostStart != null && ghostEnd != null) {
-                long off = java.time.temporal.ChronoUnit.DAYS.between(first, ghostStart.toLocalDate());
-                if (off >= 0 && off < days) {
-                    int c = (int) off;
-                    int sm = ghostStart.toLocalTime().toSecondOfDay() / 60;
-                    int em = ghostEnd.toLocalTime().equals(LocalTime.MIDNIGHT) ? 1440 : ghostEnd.toLocalTime().toSecondOfDay() / 60;
+                String sub = Time.range(ghostStart, ghostEnd);
+                for (int c = 0; c < days; c++) {
+                    LocalDateTime dayStart = first.plusDays(c).atStartOfDay(), dayEnd = dayStart.plusDays(1);
+                    if (!ghostStart.isBefore(dayEnd) || !ghostEnd.isAfter(dayStart)) continue;
+                    LocalDateTime a = ghostStart.isAfter(dayStart) ? ghostStart : dayStart;
+                    LocalDateTime b = ghostEnd.isBefore(dayEnd) ? ghostEnd : dayEnd;
+                    int sm = (int) java.time.Duration.between(dayStart, a).toMinutes();
+                    int em = (int) java.time.Duration.between(dayStart, b).toMinutes();
                     int y = (int) (sm * HOUR_H / 60.0) + 1;
                     int hh = Math.max(18, (int) ((em - sm) * HOUR_H / 60.0) - 2);
                     int x = GUTTER + c * cw + 4;
-                    String sub = Time.range(ghostStart, ghostEnd);
                     if (ghostTask != null) {
                         TaskVisuals.paintBlock(g2, ghostTask, x, y, cw - 8, hh, false, true, sub);
                         g2.setColor(Theme.accent);

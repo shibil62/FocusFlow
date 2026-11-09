@@ -15,7 +15,7 @@ public final class Database {
 
     public interface SqlWork<T> { T run(Connection c) throws SQLException; }
 
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     private static Connection conn;
     private static Path path;
 
@@ -111,7 +111,39 @@ public final class Database {
             throw new SQLException("This database was created by a newer version of FocusFlow.");
         }
         if (v < 1) applyV1();
-        // Future versions: if (v < 2) applyV2(); ...
+        if (v >= 1 && v < 2) safetyCopyBeforeV2();
+        if (v < 2) applyV2();
+        // Future versions: if (v < 3) applyV3(); ...
+    }
+
+    /** One-time safety copy of an existing database, made right before the v2 upgrade touches it. */
+    private static void safetyCopyBeforeV2() {
+        try {
+            Path bak = path.resolveSibling("focusflow-before-colors-update.db");
+            if (Files.exists(bak)) return;
+            try (Statement st = conn.createStatement()) {
+                st.execute("VACUUM INTO '" + bak.toAbsolutePath().toString().replace("'", "''") + "'");
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** v2: adds a per-task colour. Existing rows are untouched (colour stays NULL until the user picks one). */
+    private static void applyV2() throws SQLException {
+        conn.setAutoCommit(false);
+        try (Statement s = conn.createStatement()) {
+            boolean has = false;
+            try (ResultSet rs = s.executeQuery("PRAGMA table_info(tasks)")) {
+                while (rs.next()) if ("color".equalsIgnoreCase(rs.getString("name"))) has = true;
+            }
+            if (!has) s.execute("ALTER TABLE tasks ADD COLUMN color TEXT");
+            s.execute("PRAGMA user_version = 2");
+            conn.commit();
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
+        }
     }
 
     private static void applyV1() throws SQLException {

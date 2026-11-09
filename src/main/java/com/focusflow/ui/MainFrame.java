@@ -74,6 +74,9 @@ public class MainFrame extends JFrame {
 
         addWindowListener(new WindowAdapter() {
             @Override public void windowClosing(WindowEvent e) { closeRequested(); }
+            @Override public void windowActivated(WindowEvent e) {
+                if (!immersiveShown) SwingUtilities.invokeLater(MainFrame.this::refreshCurrent);
+            }
         });
         installShortcuts();
         AppContext.focus.addListener(this::syncImmersive);
@@ -86,6 +89,9 @@ public class MainFrame extends JFrame {
         setVisible(true);
         AppContext.tray.install(this);
         AppContext.notifications.start();
+        // The dashboard is the first view shown and was built while hidden: fill it now instead of
+        // waiting for the 30-second timer.
+        refreshCurrent();
         playIntro();
         SwingUtilities.invokeLater(this::syncImmersive);
     }

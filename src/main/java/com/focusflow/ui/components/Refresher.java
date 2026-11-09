@@ -4,8 +4,12 @@ import com.focusflow.services.Notifier;
 
 import javax.swing.*;
 import javax.swing.Timer;
+import java.awt.event.HierarchyEvent;
 
-/** Coalesces change events into one refresh, only while the view is visible; also refreshes every 30s for clocks. */
+/**
+ * Coalesces change events into one refresh, only while the view is visible; also refreshes every 30s for clocks,
+ * and once whenever the view becomes visible (so a view that was built while hidden never stays empty).
+ */
 public final class Refresher {
     private Refresher() {}
 
@@ -14,6 +18,9 @@ public final class Refresher {
         debounce.setRepeats(false);
         Runnable trigger = () -> { if (view.isShowing()) debounce.restart(); };
         for (Notifier n : sources) n.addListener(trigger);
+        view.addHierarchyListener(e -> {
+            if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && view.isShowing()) debounce.restart();
+        });
         new Timer(30_000, e -> { if (view.isShowing()) refresh.run(); }).start();
     }
 

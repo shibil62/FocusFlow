@@ -19,6 +19,13 @@ public class TaskService extends Notifier {
     public TaskService(TaskRepository repo) {
         this.repo = repo;
         cache.addAll(repo.findAll());
+        // Tasks made before colours existed get a random one once, and keep it.
+        for (Task t : cache) {
+            if (t.color == null) {
+                t.color = randomColor();
+                repo.updateColor(t.id, t.color);
+            }
+        }
     }
 
     public void reload() {
@@ -72,6 +79,13 @@ public class TaskService extends Notifier {
         return r;
     }
 
+    /** A fully random, good-looking colour ("#RRGGBB"): random hue, always vivid enough to read on both themes. */
+    public static String randomColor() {
+        java.util.concurrent.ThreadLocalRandom r = java.util.concurrent.ThreadLocalRandom.current();
+        java.awt.Color c = java.awt.Color.getHSBColor(r.nextFloat(), 0.60f + r.nextFloat() * 0.30f, 0.80f + r.nextFloat() * 0.20f);
+        return String.format("#%02X%02X%02X", c.getRed(), c.getGreen(), c.getBlue());
+    }
+
     // -------------------------------------------------------------- mutations
 
     public Task save(Task edited) {
@@ -93,6 +107,7 @@ public class TaskService extends Notifier {
         }
 
         if (old == null) {
+            if (edited.color == null) edited.color = randomColor();
             repo.insert(edited);
             cache.add(edited);
             repo.history(edited.id, "created", edited.title);
