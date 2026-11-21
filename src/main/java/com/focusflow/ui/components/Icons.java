@@ -12,7 +12,7 @@ public final class Icons {
     public enum Type {
         DASHBOARD, CALENDAR, TASKS, FOCUS, ANALYTICS, SETTINGS, PLUS, CHECK, CHEV_L, CHEV_R, CHEV_D, SEARCH, TRASH,
         CLOCK, WARNING, PLAY, PAUSE, STOP, SUN, MOON, CLOSE, EDIT, FLAG, SIDEBAR, MORE, UNDO, REPEAT, FLAME, RESET,
-        ARCHIVE, DOWNLOAD, UPLOAD, FOLDER
+        ARCHIVE, DOWNLOAD, UPLOAD, FOLDER, HELP
     }
 
     public static void paint(Graphics g0, Type t, double x, double y, double size, Color c) {
@@ -183,6 +183,13 @@ public final class Icons {
                 p.lineTo(18.5, 8); p.quadTo(20.5, 8, 20.5, 10); p.lineTo(20.5, 17.5); p.quadTo(20.5, 19.5, 18.5, 19.5);
                 p.lineTo(5.5, 19.5); p.quadTo(3.5, 19.5, 3.5, 17.5); p.closePath();
                 g.draw(p);
+            }
+            case HELP -> {
+                g.draw(new Ellipse2D.Double(3.5, 3.5, 17, 17));
+                Path2D q = new Path2D.Double();
+                q.moveTo(9.4, 9.6); q.curveTo(9.4, 6.6, 14.6, 6.6, 14.6, 9.6); q.curveTo(14.6, 11.6, 12, 11.6, 12, 13.6);
+                g.draw(q);
+                g.fill(new Ellipse2D.Double(11, 15.6, 2, 2));
             }
         }
         g.dispose();

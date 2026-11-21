@@ -52,6 +52,7 @@ public class NotificationService {
     }
 
     private void check() {
+        AppContext.tasks.expirePastEvents();
         if (!on(SettingsService.NOTIFY_ENABLED, true)) return;
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();
@@ -85,8 +86,12 @@ public class NotificationService {
                         critical.size() + " tasks are due within " + critH + " hours.")) budget--;
             } else {
                 for (Task t : critical) {
-                    if (budget > 0 && deliver("critical", "crit:" + t.id + ":" + t.deadline, t.id, "Due soon",
-                            t.title + " is due " + Time.relativeDay(t.deadlineDate()).toLowerCase() + " at " + Time.time(t.deadlineDT()))) budget--;
+                    String when = t.isDueDayOnly()
+                            ? Time.relativeDay(t.deadlineDate()).toLowerCase()
+                            : Time.relativeDay(t.deadlineDate()).toLowerCase() + " at " + Time.time(t.deadlineDT());
+                    if (budget > 0 && deliver("critical", "crit:" + t.id + ":" + t.deadline, t.id,
+                            t.isDayEvent() ? (t.deadlineDate().equals(today) ? "Today" : "Coming up") : t.isDueDayOnly() && t.deadlineDate().equals(today) ? "Due today" : "Due soon",
+                            t.title + (t.isDayEvent() ? " is " : " is due ") + when)) budget--;
                 }
             }
         }

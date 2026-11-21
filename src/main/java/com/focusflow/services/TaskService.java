@@ -26,6 +26,25 @@ public class TaskService extends Notifier {
                 repo.updateColor(t.id, t.color);
             }
         }
+        expirePastEvents();
+    }
+
+    /**
+     * "Just a date" tasks (an exam day, for example) are not ticked off: once their day is over they quietly
+     * move to Completed, dated on their own day, so they stop showing as pending or overdue.
+     */
+    public void expirePastEvents() {
+        LocalDate today = Time.today();
+        boolean any = false;
+        for (Task t : new ArrayList<>(cache)) {
+            if (t.isCompleted() || !t.isDayEvent() || !t.deadlineDate().isBefore(today)) continue;
+            Task c = t.copy();
+            c.status = Status.COMPLETED;
+            c.completedAt = Time.ms(t.deadlineDate().atTime(23, 59));
+            save(c);
+            any = true;
+        }
+        if (any) fire();
     }
 
     public void reload() {
@@ -58,8 +77,7 @@ public class TaskService extends Notifier {
     public List<Task> forDay(LocalDate d) {
         List<Task> r = new ArrayList<>();
         for (Task t : all()) {
-            LocalDate sd = t.scheduledDate();
-            if (sd != null ? t.coversDay(d) : (t.deadlineDate() != null && t.deadlineDate().equals(d))) r.add(t);
+            if (t.showsOn(d) || t.showsAsDueOn(d)) r.add(t);
         }
         r.sort(Comparator.comparing((Task t) -> !t.allDay && t.start != null)
                 .thenComparing(t -> t.start == null ? Long.MAX_VALUE : t.start)

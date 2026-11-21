@@ -48,7 +48,7 @@ public class AnalyticsService {
         LocalDate today = Time.today();
         int total = 0, done = 0, overdue = 0, urgent = 0;
         for (Task t : tasks.all()) {
-            boolean mine = (t.start != null ? t.coversDay(today) : today.equals(planDate(t))) || today.equals(completedDate(t));
+            boolean mine = (t.start != null ? t.showsOn(today) : today.equals(planDate(t))) || today.equals(completedDate(t));
             if (mine) { total++; if (t.isCompleted()) done++; }
             if (TaskService.isOverdue(t)) overdue++;
             else if (!t.isCompleted()) {

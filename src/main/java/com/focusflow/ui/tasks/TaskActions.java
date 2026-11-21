@@ -66,7 +66,8 @@ public final class TaskActions {
         LocalDateTime now = LocalDateTime.now();
         if (base.isBefore(now)) base = now;
         Task c = t.copy();
-        c.setDeadline(base.plusDays(days));
+        if (t.isDueDayOnly()) c.setDeadlineDay(base.toLocalDate().plusDays(days));
+        else c.setDeadline(base.plusDays(days));
         AppContext.tasks.saveUndoable(c, "Deadline changed");
         Toast.show("Deadline moved to " + Time.dateShort(c.deadlineDate()), "Undo", AppContext.tasks::undoLast);
     }

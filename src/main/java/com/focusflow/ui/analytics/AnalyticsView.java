@@ -121,7 +121,7 @@ public class AnalyticsView extends JPanel {
             double[] sd = new double[days.size()];
             for (int i = 0; i < sd.length; i++) sd[i] = sub[i];
             daily.setData(lb, new String[]{"Planned", "Completed", "Subtasks"},
-                    new Color[]{Gfx.mix(Theme.surface, Theme.text, 0.2), Theme.accent, new Color(0x40C8E0)}, new double[][]{p, c, sd});
+                    new Color[]{Gfx.mix(Theme.surface, Theme.text, 0.2), Theme.accent, Theme.accent3}, new double[][]{p, c, sd});
             cl.show(dailyHost, "bars");
         } else {
             String[] lb = new String[days.size()];
@@ -153,7 +153,7 @@ public class AnalyticsView extends JPanel {
             dn[i] = DayOfWeek.of(i + 1).getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
             dv[i] = wd[i];
         }
-        weekday.setData(dn, new String[]{"Completed"}, new Color[]{new Color(0x5E5CE6)}, new double[][]{dv});
+        weekday.setData(dn, new String[]{"Completed"}, new Color[]{Theme.accent2}, new double[][]{dv});
         weekday.setHighlight(wd[bi] == 0 ? -1 : bi);
 
         List<CatTime> ct = AppContext.analytics.focusByCategory(from, to);

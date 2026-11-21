@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
  *   45%  workload pressure (remaining work that is not yet covered by a scheduled session, versus the
  *                           productive hours left; productive hours are assumed to be 8 of every 24)
  *   +/-  priority nudge  (low -5, normal 0, high +6, critical +12)
+ * A date-only deadline (no time) is treated as due at 11:59 PM, and on the due day itself it is always an
+ * emergency (Critical, score 100) until the task is completed.
  * It is an estimate to help you plan, not a prediction.
  */
 public class UrgencyService {
@@ -26,6 +28,12 @@ public class UrgencyService {
     public Urgency evaluate(Task t, LocalDateTime now) {
         if (t.isCompleted()) return new Urgency(Level.DONE, 0, "Completed", "", false);
         if (t.deadline == null) return new Urgency(Level.NONE, 0, "No deadline set.", "", false);
+
+        // A date-only deadline (an exam day, for example) is an emergency for the whole of that day.
+        if (t.isDueDayOnly() && t.deadlineDate().equals(now.toLocalDate())) {
+            if (t.isDayEvent()) return new Urgency(Level.CRITICAL, 100, "This is happening today.", "Today", false);
+            return new Urgency(Level.CRITICAL, 100, "Due today. Finish it today.", "Due today", false);
+        }
 
         LocalDateTime dl = t.deadlineDT();
         double h = Duration.between(now, dl).toMinutes() / 60.0;
@@ -80,7 +88,13 @@ public class UrgencyService {
         else if (level.ordinal() >= Level.APPROACHING.ordinal()) msg = "Deadline approaching.";
         else msg = "Plenty of time remaining.";
 
-        return new Urgency(level, score, msg, span(h) + " left", overloaded);
+        String countdown = span(h) + " left";
+        if (t.isDueDayOnly()) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), t.deadlineDate());
+            if (t.isDayEvent()) countdown = days == 1 ? "Tomorrow" : "In " + days + " days";
+            else countdown = days == 1 ? "Due tomorrow" : "Due in " + days + " days";
+        }
+        return new Urgency(level, score, msg, countdown, overloaded);
     }
 
     private static int effectiveMinutes(Task t) {

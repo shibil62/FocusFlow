@@ -33,6 +33,33 @@ public final class AppContext {
         notifications = new NotificationService(new NotificationRepository());
     }
 
+    /** Opens the main window, building it first if it was released while running in the background. */
+    public static void showMain() {
+        if (frame == null) {
+            MainFrame f = new MainFrame();
+            frame = f;
+            f.start(false);
+        } else {
+            frame.showFromTray();
+        }
+    }
+
+    /** Runs {@code r} once the main window is open and laid out. */
+    public static void inMain(Runnable r) {
+        showMain();
+        javax.swing.SwingUtilities.invokeLater(r);
+    }
+
+    public static void quit() {
+        try {
+            if (frame != null) frame.saveBoundsNow();
+            tray.remove();
+            com.focusflow.database.Database.close();
+        } finally {
+            System.exit(0);
+        }
+    }
+
     /** Re-reads everything from the database (after a restore). */
     public static void reloadAll() {
         settings.reload();

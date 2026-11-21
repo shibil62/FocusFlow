@@ -52,6 +52,14 @@ Your tasks are stored on your own computer, in `%APPDATA%\FocusFlow`. Nothing is
 
 ![Calendar](docs/screenshots/calendar.png)
 
+### Desktop widget
+* A small calendar for your desktop, in the style of the iPhone calendar widget: big date on the left, month on the right.
+* Point at a date and the dates around it swell like a lens while every task on that day pops up as a bubble. Click a bubble to open the task.
+* Eight colour looks plus "Match app", free resizing by dragging its edges (it hides details when small), adjustable see-through level, optional keep-on-top. Right-click it for quick options.
+
+### Date-only deadlines
+* Turn on **Deadline** and **Date only (no time)** for things like an exam day. On that day the task becomes an emergency (Critical, score 100) until you complete it.
+
 ### Deadline intelligence
 Every task with a deadline gets a level and a score from 0 to 100.
 

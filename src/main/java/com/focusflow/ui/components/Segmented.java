@@ -63,7 +63,7 @@ public class Segmented extends JComponent {
         double sw = segW();
         double tx = 3 + thumb.value * sw;
         if (!Theme.dark) Gfx.shadow(g2, tx, 3, sw, h - 6, h - 6, 3, 0.10);
-        g2.setColor(Theme.dark ? new Color(0x636366) : Theme.surface);
+        g2.setColor(Theme.dark ? Gfx.mix(Theme.surfaceAlt, Theme.text, 0.20) : Theme.surface);
         g2.fill(Gfx.rr(tx, 3, sw, h - 6, h - 6));
         for (int i = 0; i < labels.length; i++) {
             boolean sel = i == selected;

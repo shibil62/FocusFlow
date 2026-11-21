@@ -47,10 +47,10 @@ public class DashboardView extends JPanel {
         setOpaque(false);
         total = new StatCard(Icons.Type.TASKS, "Tasks today", () -> Theme.accent, StatCard.Kind.COUNT);
         done = new StatCard(Icons.Type.CHECK, "Completed", () -> Theme.success, StatCard.Kind.COUNT);
-        remaining = new StatCard(Icons.Type.CLOCK, "Remaining", () -> new Color(0x5E5CE6), StatCard.Kind.COUNT);
+        remaining = new StatCard(Icons.Type.CLOCK, "Remaining", () -> Theme.accent2, StatCard.Kind.COUNT);
         overdue = new StatCard(Icons.Type.WARNING, "Overdue", () -> Theme.danger, StatCard.Kind.COUNT);
         urgent = new StatCard(Icons.Type.FLAME, "Urgent", () -> Theme.warning, StatCard.Kind.COUNT);
-        worked = new StatCard(Icons.Type.FOCUS, "Time worked", () -> new Color(0x40C8E0), StatCard.Kind.DURATION);
+        worked = new StatCard(Icons.Type.FOCUS, "Time worked", () -> Theme.accent3, StatCard.Kind.DURATION);
         percent = new StatCard(Icons.Type.ANALYTICS, "Done today", () -> Theme.success, StatCard.Kind.PERCENT);
         range = new Segmented(new String[]{"Today", "Week", "Month", "Custom"}, 1, i -> {
             if (i == 3) pickCustom(); else refresh();

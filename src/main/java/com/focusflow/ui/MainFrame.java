@@ -13,11 +13,13 @@ import com.focusflow.ui.dashboard.DashboardView;
 import com.focusflow.ui.dialogs.SearchSheet;
 import com.focusflow.ui.dialogs.TaskDialog;
 import com.focusflow.ui.focus.FocusView;
+import com.focusflow.ui.help.HelpView;
 import com.focusflow.ui.focus.ImmersivePanel;
 import com.focusflow.ui.settings.SettingsView;
 import com.focusflow.ui.tasks.TasksView;
 import com.focusflow.utilities.Gfx;
 import com.focusflow.utilities.Time;
+import com.focusflow.widget.WidgetController;
 import com.formdev.flatlaf.FlatLaf;
 
 import javax.swing.*;
@@ -30,33 +32,22 @@ import java.awt.image.BufferedImage;
 public class MainFrame extends JFrame {
     private final Sidebar sidebar;
     private final FadePane host = new FadePane();
-    private final DashboardView dashboard;
-    private final CalendarView calendar;
-    private final TasksView tasksView;
-    private final FocusView focusView;
-    private final AnalyticsView analytics;
-    private final SettingsView settingsView;
-    private final JComponent[] views;
+    // Views are built the first time they are opened, so the window starts light.
+    private final JComponent[] views = new JComponent[7];
     private int current = 0;
     private ImmersivePanel immersive;
     private boolean immersiveShown, hiding;
     private int stateBeforeImmersive = NORMAL;
     private boolean trayHintShown;
+    private final Runnable focusListener = this::syncImmersive;
 
     public MainFrame() {
         super("FocusFlow");
         AppContext.frame = this;
-        setIconImages(java.util.List.of(AppIcon.create(256), AppIcon.create(64), AppIcon.create(32), AppIcon.create(16)));
+        setIconImages(java.util.List.of(AppIcon.cached(256), AppIcon.cached(64), AppIcon.cached(32), AppIcon.cached(16)));
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(1100, 700));
 
-        dashboard = new DashboardView();
-        calendar = new CalendarView();
-        tasksView = new TasksView();
-        focusView = new FocusView();
-        analytics = new AnalyticsView();
-        settingsView = new SettingsView();
-        views = new JComponent[]{dashboard, calendar, tasksView, focusView, analytics, settingsView};
 
         JPanel root = new JPanel(new BorderLayout()) {
             @Override protected void paintComponent(Graphics g) {
@@ -68,7 +59,7 @@ public class MainFrame extends JFrame {
                 AppContext.settings.getBool(SettingsService.SIDEBAR_COLLAPSED, false),
                 c -> AppContext.settings.setQuiet(SettingsService.SIDEBAR_COLLAPSED, String.valueOf(c)));
         root.add(sidebar, BorderLayout.WEST);
-        host.add(dashboard);
+        host.add(view(0));
         root.add(host, BorderLayout.CENTER);
         setContentPane(root);
 
@@ -79,20 +70,32 @@ public class MainFrame extends JFrame {
             }
         });
         installShortcuts();
-        AppContext.focus.addListener(this::syncImmersive);
+        AppContext.focus.addListener(focusListener);
         restoreBounds();
+    }
+
+    private JComponent view(int i) {
+        if (views[i] == null) {
+            views[i] = switch (i) {
+                case 0 -> new DashboardView();
+                case 1 -> new CalendarView();
+                case 2 -> new TasksView();
+                case 3 -> new FocusView();
+                case 4 -> new AnalyticsView();
+                case 5 -> new SettingsView();
+                default -> new HelpView();
+            };
+        }
+        return views[i];
     }
 
     // ------------------------------------------------------------- lifecycle
 
-    public void start() {
+    /** Shows the window. The tray icon, reminders and widget are started once by Main, not here. */
+    public void start(boolean withIntro) {
         setVisible(true);
-        AppContext.tray.install(this);
-        AppContext.notifications.start();
-        // The dashboard is the first view shown and was built while hidden: fill it now instead of
-        // waiting for the 30-second timer.
         refreshCurrent();
-        playIntro();
+        if (withIntro) playIntro();
         SwingUtilities.invokeLater(this::syncImmersive);
     }
 
@@ -129,27 +132,39 @@ public class MainFrame extends JFrame {
     }
 
     private void closeRequested() {
-        if (AppContext.settings.getBool(SettingsService.CLOSE_TO_TRAY, false) && AppContext.tray.isAvailable()) {
-            saveBounds();
-            setVisible(false);
+        boolean background = AppContext.settings.getBool(SettingsService.CLOSE_TO_TRAY, false)
+                || AppContext.settings.getBool(SettingsService.WIDGET_ENABLED, true);
+        if (background) {
+            releaseToBackground();
             if (!trayHintShown) {
                 trayHintShown = true;
-                AppContext.tray.message("FocusFlow is still running", "Reminders stay active. Use the tray icon to reopen or quit.");
+                AppContext.tray.message("FocusFlow is still running", "Your desktop widget and reminders stay active. Use the tray icon to reopen or quit.");
             }
             return;
         }
         quit();
     }
 
-    public void quit() {
-        try {
-            saveBounds();
-            AppContext.tray.remove();
-            Database.close();
-        } finally {
-            System.exit(0);
-        }
+    /**
+     * Closes the window for real and frees everything it held (views, charts, timers, listeners). Only the widget,
+     * the tray icon and the reminders keep running, which uses a fraction of the memory.
+     */
+    private void releaseToBackground() {
+        saveBounds();
+        setVisible(false);
+        AppContext.focus.removeListener(focusListener);
+        Janitor.runAll();
+        Sheet.reset();
+        AppContext.frame = null;
+        dispose();
+        Timer gc = new Timer(400, e -> System.gc());
+        gc.setRepeats(false);
+        gc.start();
     }
+
+    public void saveBoundsNow() { saveBounds(); }
+
+    public void quit() { AppContext.quit(); }
 
     public void showFromTray() {
         setVisible(true);
@@ -167,30 +182,30 @@ public class MainFrame extends JFrame {
         sidebar.setSelected(i);
         host.transition(() -> {
             host.removeAll();
-            host.add(views[i]);
+            host.add(view(i));
             refreshCurrent();
         }, dir);
     }
 
     private void refreshCurrent() {
         switch (current) {
-            case 0 -> dashboard.refresh();
-            case 1 -> calendar.refresh();
-            case 2 -> tasksView.refresh();
-            case 3 -> focusView.refresh();
-            case 4 -> analytics.refresh();
+            case 0 -> ((DashboardView) view(0)).refresh();
+            case 1 -> ((CalendarView) view(1)).refresh();
+            case 2 -> ((TasksView) view(2)).refresh();
+            case 3 -> ((FocusView) view(3)).refresh();
+            case 4 -> ((AnalyticsView) view(4)).refresh();
             default -> { }
         }
     }
 
     public void openTasks(int filter) {
         navigate(2);
-        tasksView.setFilter(filter);
+        ((TasksView) view(2)).setFilter(filter);
     }
 
     public void startFocusFor(long taskId) {
         navigate(3);
-        focusView.selectTask(taskId);
+        ((FocusView) view(3)).selectTask(taskId);
     }
 
     // ------------------------------------------------------------ shortcuts
@@ -199,11 +214,12 @@ public class MainFrame extends JFrame {
         int ctrl = InputEvent.CTRL_DOWN_MASK;
         key(KeyEvent.VK_N, ctrl, "new", TaskDialog::create);
         key(KeyEvent.VK_K, ctrl, "search", SearchSheet::open);
-        key(KeyEvent.VK_T, ctrl, "today", () -> { navigate(1); calendar.goToday(); });
+        key(KeyEvent.VK_T, ctrl, "today", () -> { navigate(1); ((CalendarView) view(1)).goToday(); });
         key(KeyEvent.VK_D, ctrl, "dark", () -> setDark(!Theme.dark));
         key(KeyEvent.VK_B, ctrl, "side", () -> sidebar.setCollapsed(!sidebar.isCollapsed(), true));
         key(KeyEvent.VK_COMMA, ctrl, "settings", () -> navigate(5));
-        for (int i = 0; i < 6; i++) {
+        key(KeyEvent.VK_F1, 0, "help", () -> navigate(6));
+        for (int i = 0; i < 7; i++) {
             final int idx = i;
             key(KeyEvent.VK_1 + i, ctrl, "nav" + i, () -> navigate(idx));
         }
@@ -227,8 +243,8 @@ public class MainFrame extends JFrame {
 
     // -------------------------------------------------------------- theming
 
-    public void setDark(boolean dark) {
-        if (dark == Theme.dark) return;
+    /** Runs a theme change with the same soft cross-fade, then repaints everything that depends on the colours. */
+    private void swapTheme(Runnable change) {
         JLayeredPane lp = getLayeredPane();
         BufferedImage old = null;
         if (!Animator.reduceMotion && lp.getWidth() > 0) {
@@ -241,11 +257,12 @@ public class MainFrame extends JFrame {
             lp.printAll(g);
             g.dispose();
         }
-        AppContext.settings.setQuiet(SettingsService.THEME, dark ? "dark" : "light");
-        Theme.apply(dark);
+        change.run();
         FlatLaf.updateUI();
         refreshCurrent();
         repaint();
+        refreshIcons();
+        WidgetController.themeChanged();
         if (old == null) return;
         BufferedImage snap = old;
         double[] p = {0};
@@ -262,11 +279,58 @@ public class MainFrame extends JFrame {
         Animator.tween(340, v -> { p[0] = v; veil.repaint(); }, () -> { lp.remove(veil); lp.repaint(); });
     }
 
+    /** The window icon (title bar and taskbar while running) and the tray icon follow the theme colour. */
+    private void refreshIcons() {
+        setIconImages(java.util.List.of(AppIcon.cached(256), AppIcon.cached(64), AppIcon.cached(32), AppIcon.cached(16)));
+        AppContext.tray.refreshIcon();
+    }
+
+    /** Classic light or dark. Leaves any colour theme. */
+    public void setDark(boolean dark) {
+        if (dark == Theme.dark && Theme.paletteName.isEmpty()) return;
+        swapTheme(() -> {
+            AppContext.settings.setQuiet(SettingsService.THEME, dark ? "dark" : "light");
+            AppContext.settings.setQuiet(SettingsService.APP_PALETTE, "");
+            Theme.paletteName = "";
+            Theme.apply(dark);
+        });
+    }
+
+    /** A colour theme (one of the widget palettes) for the whole app, or "" for the classic look. */
+    public void setPalette(String name) {
+        String n = name == null ? "" : name;
+        if (n.equals(Theme.paletteName)) return;
+        swapTheme(() -> {
+            AppContext.settings.setQuiet(SettingsService.APP_PALETTE, n);
+            Theme.paletteName = n;
+            Theme.apply("dark".equals(AppContext.settings.get(SettingsService.THEME, "light")));
+        });
+    }
+
+    /** Changes the accent colour of the classic look (and of a widget that follows the app colours). */
+    public void setAccent(String name) {
+        if (name == null || (name.equals(Theme.accentName) && Theme.paletteName.isEmpty())) return;
+        swapTheme(() -> {
+            AppContext.settings.setQuiet(SettingsService.ACCENT, name);
+            AppContext.settings.setQuiet(SettingsService.APP_PALETTE, "");
+            Theme.accentName = name;
+            Theme.paletteName = "";
+            Theme.apply("dark".equals(AppContext.settings.get(SettingsService.THEME, "light")));
+        });
+    }
+
     /** Re-applies stored preferences after a backup was restored. */
     public void afterRestore() {
         Animator.reduceMotion = AppContext.settings.getBool(SettingsService.REDUCE_MOTION, false);
         boolean dark = "dark".equals(AppContext.settings.get(SettingsService.THEME, "light"));
-        if (dark != Theme.dark) setDark(dark);
+        String acc = AppContext.settings.get(SettingsService.ACCENT, "Blue");
+        String pal = AppContext.settings.get(SettingsService.APP_PALETTE, "");
+        boolean changed = !acc.equals(Theme.accentName) || !pal.equals(Theme.paletteName);
+        Theme.accentName = acc;
+        Theme.paletteName = pal;
+        if (pal.isEmpty() && dark != Theme.dark) setDark(dark);
+        else if (changed) { Theme.apply(dark); FlatLaf.updateUI(); refreshIcons(); }
+        WidgetController.sync();
         sidebar.setCollapsed(AppContext.settings.getBool(SettingsService.SIDEBAR_COLLAPSED, false), false);
         refreshCurrent();
     }
@@ -309,12 +373,15 @@ public class MainFrame extends JFrame {
             immersiveShown = false;
             hiding = false;
             setExtendedState(stateBeforeImmersive);
-            focusView.refresh();
+            if (views[3] != null) ((FocusView) views[3]).refresh();
             if (AppContext.focus.state() != FocusService.State.IDLE) syncImmersive();
         });
     }
 
     // ----------------------------------------------------------------- intro
+
+    /** Plays the opening animation (only for the very first window of a session). */
+    public void playIntroOnce() { playIntro(); }
 
     private void playIntro() {
         JLayeredPane lp = getLayeredPane();

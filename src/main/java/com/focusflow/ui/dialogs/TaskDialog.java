@@ -28,7 +28,10 @@ public final class TaskDialog extends JPanel {
     private final JComboBox<Status> status = new JComboBox<>(Status.values());
     private final JComboBox<Recurrence> recur = new JComboBox<>(Recurrence.values());
     private final Segmented prio;
-    private final Toggle schedT, allDayT, dlT;
+    private final Toggle schedT, allDayT, dlT, dayT;
+    private final Segmented mode;
+    private final JSpinner evDate;
+    private final List<JComponent> timedRows = new ArrayList<>(), dateRows = new ArrayList<>();
     private final JSpinner sDate, sStart, eDate, sEnd, uDate, dDate, dTime, est;
     private LocalDateTime prevStart;
     private boolean adjusting, endDateManual;
@@ -80,6 +83,9 @@ public final class TaskDialog extends JPanel {
         schedT = new Toggle(scheduled, v -> { syncEnabled(); updateHint(); });
         allDayT = new Toggle(allDay, v -> { syncEnabled(); updateHint(); });
         dlT = new Toggle(hasDl, v -> { syncEnabled(); updateHint(); });
+        dayT = new Toggle(existing != null && existing.deadlineAllDay, v -> { syncEnabled(); updateHint(); });
+        evDate = Pickers.date(existing != null && existing.isDayEvent() ? existing.deadlineDate() : baseDate);
+        mode = new Segmented(new String[]{"Has a time", "Just a date"}, existing != null && existing.isDayEvent() ? 1 : 0, i -> applyMode());
         prio = new Segmented(new String[]{"Low", "Normal", "High", "Critical"}, existing != null ? existing.priority.ordinal() : 1, i -> {});
 
         cat.addItem(NONE);
@@ -129,6 +135,7 @@ public final class TaskDialog extends JPanel {
         title.addActionListener(ev -> save());
 
         buildForm();
+        applyMode();
         JScrollPane sp = Refresher.scroll(form);
         sp.setBorder(new EmptyBorder(0, 0, 0, 0));
         add(header(), BorderLayout.NORTH);
@@ -189,27 +196,38 @@ public final class TaskDialog extends JPanel {
         addRow(three, 12);
         addRow(field("Priority", prio), 12);
 
-        addRow(switchRow("Schedule on calendar", "A work session you plan to do", schedT), 18);
+        addRow(field("What kind of task is this?", mode), 18);
+        JComponent evRow = field("Date", evDate);
+        addRow(evRow, 10);
+        dateRows.add(evRow);
+        JComponent evNote = new Lbl("It just happens on this day, for example an exam. No time and nothing to tick off. "
+                + "It is highlighted as an emergency that day and then goes by itself afterwards.", Theme.font(12f), Lbl.Role.TEXT2);
+        evNote.setPreferredSize(new Dimension(100, 34));
+        addRow(evNote, 6);
+        dateRows.add(evNote);
+
+        addTimed(switchRow("Schedule on calendar", "A work session you plan to do", schedT), 18);
         JPanel sched = new JPanel(new GridLayout(1, 2, 10, 0));
         sched.setOpaque(false);
         sched.add(field("Start date", sDate));
         sched.add(field("Start time", sStart));
-        addRow(sched, 8);
+        addTimed(sched, 8);
         JPanel schedEnd = new JPanel(new GridLayout(1, 2, 10, 0));
         schedEnd.setOpaque(false);
         schedEnd.add(field("End date (pick the next day for overnight tasks)", eDate));
         schedEnd.add(field("End time", sEnd));
-        addRow(schedEnd, 8);
-        addRow(switchRow("All day", "No specific time. Use \"Until\" for work that spans several days", allDayT), 8);
-        addRow(field("Until (last day, optional)", uDate), 8);
+        addTimed(schedEnd, 8);
+        addTimed(switchRow("All day", "No specific time. Use \"Until\" for work that spans several days", allDayT), 8);
+        addTimed(field("Until (last day, optional)", uDate), 8);
 
-        addRow(switchRow("Deadline", "When it has to be finished. Separate from the schedule", dlT), 18);
+        addTimed(switchRow("Deadline", "When it has to be finished. Separate from the schedule", dlT), 18);
+        addTimed(switchRow("Date only (no time)", "For things like an exam day. It becomes an emergency on that day", dayT), 8);
         JPanel dl = new JPanel(new GridLayout(1, 2, 10, 0));
         dl.setOpaque(false);
         dl.add(field("Due date", dDate));
         dl.add(field("Due time", dTime));
-        addRow(dl, 8);
-        addRow(hint, 6);
+        addTimed(dl, 8);
+        addTimed(hint, 6);
 
         JPanel two = new JPanel(new GridLayout(1, 2, 12, 0));
         two.setOpaque(false);
@@ -231,6 +249,20 @@ public final class TaskDialog extends JPanel {
         f.gridy = 9999;
         f.weighty = 1;
         form.add(Box.createGlue(), f);
+    }
+
+    private void addTimed(JComponent c, int gap) {
+        addRow(c, gap);
+        timedRows.add(c);
+    }
+
+    /** "Just a date" hides the time-related options; "Has a time" shows them. */
+    private void applyMode() {
+        boolean day = mode.getSelected() == 1;
+        for (JComponent c : timedRows) c.setVisible(!day);
+        for (JComponent c : dateRows) c.setVisible(day);
+        form.revalidate();
+        form.repaint();
     }
 
     private JComponent wrapSubs() {
@@ -296,7 +328,8 @@ public final class TaskDialog extends JPanel {
         allDayT.setEnabled(sc);
         boolean dl = dlT.isOn();
         dDate.setEnabled(dl);
-        dTime.setEnabled(dl);
+        dTime.setEnabled(dl && !dayT.isOn());
+        dayT.setEnabled(dl);
     }
 
     // --------------------------------------------------------------- subtasks
@@ -377,7 +410,12 @@ public final class TaskDialog extends JPanel {
         t.priority = Priority.of(prio.getSelected());
         t.status = (Status) status.getSelectedItem();
         t.recurrence = (Recurrence) recur.getSelectedItem();
-        if (schedT.isOn()) {
+        if (mode.getSelected() == 1) {
+            t.start = null;
+            t.end = null;
+            t.allDay = false;
+            t.setDeadlineDay(Pickers.getDate(evDate));
+        } else if (schedT.isOn()) {
             LocalDate d = Pickers.getDate(sDate);
             if (allDayT.isOn()) {
                 t.allDay = true;
@@ -394,8 +432,10 @@ public final class TaskDialog extends JPanel {
             t.end = null;
             t.allDay = false;
         }
-        if (dlT.isOn()) t.setDeadline(Pickers.getDate(dDate).atTime(Pickers.getTime(dTime)));
-        else t.deadline = null;
+        if (mode.getSelected() == 1) { /* deadline already set above */ }
+        else if (dlT.isOn() && dayT.isOn()) t.setDeadlineDay(Pickers.getDate(dDate));
+        else if (dlT.isOn()) { t.setDeadline(Pickers.getDate(dDate).atTime(Pickers.getTime(dTime))); t.deadlineAllDay = false; }
+        else { t.deadline = null; t.deadlineAllDay = false; }
         t.estimatedMinutes = (Integer) est.getValue();
         t.subtasks = new ArrayList<>();
         for (SubRow r : subRows) {
@@ -409,7 +449,8 @@ public final class TaskDialog extends JPanel {
     }
 
     private void updateHint() {
-        if (hint == null || dlT == null) return;
+        if (hint == null || dlT == null || mode == null) return;
+        if (mode.getSelected() == 1) return;
         if (!dlT.isOn()) {
             hint.setText("No deadline, so urgency isn't calculated.");
             return;

@@ -63,7 +63,9 @@ public class TimeGridPane extends JScrollPane {
         setColumnHeaderView(header);
         getVerticalScrollBar().setUnitIncrement(18);
         setHorizontalScrollBarPolicy(HORIZONTAL_SCROLLBAR_NEVER);
-        new Timer(30_000, e -> { if (isShowing()) body.repaint(); }).start();
+        Timer nowLine = new Timer(30_000, e -> { if (isShowing()) body.repaint(); });
+        nowLine.start();
+        com.focusflow.ui.components.Janitor.add(nowLine::stop);
         scrollToHour(Math.max(0, java.time.LocalTime.now().getHour() - 2));
     }
 
@@ -92,7 +94,7 @@ public class TimeGridPane extends JScrollPane {
             LocalDate d = first.plusDays(c);
             List<Placed> day = new ArrayList<>();
             for (Task t : tasks) {
-                if (t.isTimed() && t.coversDay(d)) {
+                if (t.isTimed() && t.showsOn(d)) {
                     // A task that crosses midnight is drawn as one piece per day it touches.
                     LocalDateTime dayStart = d.atStartOfDay(), dayEnd = dayStart.plusDays(1);
                     LocalDateTime s = t.startDT(), e = t.endDT();
@@ -108,12 +110,13 @@ public class TimeGridPane extends JScrollPane {
                     p.endMin = (int) java.time.Duration.between(dayStart, segE).toMinutes();
                     p.endMin = Math.max(p.endMin, Math.min(1440, p.startMin + 20));
                     day.add(p);
-                } else if (t.allDay && t.start != null && t.coversDay(d)) {
+                } else if (t.allDay && t.start != null && t.showsOn(d)) {
                     allDay[c].add(t);
                 } else if (t.start == null && t.deadline != null && t.deadlineDate().equals(d)) {
                     allDay[c].add(t);
                 }
-                if (t.deadline != null && !t.isCompleted() && t.start != null && !t.allDay && t.deadlineDate().equals(d)) {
+                if (t.showsAsDueOn(d)) allDay[c].add(t);
+                if (t.deadline != null && !t.isCompleted() && t.start != null && !t.allDay && !t.isDueDayOnly() && t.deadlineDate().equals(d)) {
                     Placed p = new Placed();
                     p.t = t;
                     p.col = c;
@@ -221,7 +224,7 @@ public class TimeGridPane extends JScrollPane {
                     g2.setColor(Theme.accent);
                     g2.fill(new java.awt.geom.Ellipse2D.Double(cx - 16, 28, 32, 32));
                 }
-                Gfx.textCentered(g2, String.valueOf(d.getDayOfMonth()), cx, 44, Theme.semi(17f), isToday ? Color.WHITE : Theme.text);
+                Gfx.textCentered(g2, String.valueOf(d.getDayOfMonth()), cx, 44, Theme.semi(17f), isToday ? Theme.onAccent : Theme.text);
                 hits.add(new Object[]{new Rectangle(GUTTER + c * cw, 0, cw, 62), d});
                 g2.setColor(Theme.separator);
                 g2.drawLine(GUTTER + c * cw, 0, GUTTER + c * cw, h);

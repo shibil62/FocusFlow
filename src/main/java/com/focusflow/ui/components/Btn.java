@@ -70,7 +70,7 @@ public class Btn extends JButton {
 
         Color fill, fg;
         switch (kind) {
-            case PRIMARY -> { fill = Theme.accent; fg = Color.WHITE; }
+            case PRIMARY -> { fill = Theme.accent; fg = Theme.onAccent; }
             case TINTED -> { fill = Gfx.alpha(Theme.accent, 0.14); fg = Theme.accent; }
             case DANGER -> { fill = Theme.danger; fg = Color.WHITE; }
             case DANGER_TINTED -> { fill = Gfx.alpha(Theme.danger, 0.14); fg = Theme.danger; }

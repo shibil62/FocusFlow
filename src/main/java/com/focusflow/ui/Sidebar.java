@@ -16,8 +16,9 @@ import java.util.function.IntConsumer;
 /** Collapsible navigation rail with a spring-animated selection pill. */
 public class Sidebar extends JComponent {
     private static final int EXP = 224, COL = 76, NAV_Y = 96, ITEM_H = 40, GAP = 4;
-    private static final String[] LABELS = {"Dashboard", "Calendar", "Tasks", "Focus Mode", "Analytics", "Settings"};
-    private static final Icons.Type[] ICONS = {Icons.Type.DASHBOARD, Icons.Type.CALENDAR, Icons.Type.TASKS, Icons.Type.FOCUS, Icons.Type.ANALYTICS, Icons.Type.SETTINGS};
+    private static final String[] LABELS = {"Dashboard", "Calendar", "Tasks", "Focus Mode", "Analytics", "Settings", "Help"};
+    private static final Icons.Type[] ICONS = {Icons.Type.DASHBOARD, Icons.Type.CALENDAR, Icons.Type.TASKS, Icons.Type.FOCUS, Icons.Type.ANALYTICS, Icons.Type.SETTINGS, Icons.Type.HELP};
+    private static final int NAV = 7;
 
     private int selected, hover = -1;
     private boolean collapsed;
@@ -25,7 +26,6 @@ public class Sidebar extends JComponent {
     private final IntConsumer onNav;
     private final Runnable onNew, onTheme;
     private final Consumer<Boolean> onCollapse;
-    private final BufferedImage logo = AppIcon.create(68);
 
     public Sidebar(IntConsumer onNav, Runnable onNew, Runnable onTheme, boolean collapsed, Consumer<Boolean> onCollapse) {
         this.onNav = onNav;
@@ -46,7 +46,7 @@ public class Sidebar extends JComponent {
             @Override public void mousePressed(MouseEvent e) {
                 int h = at(e.getY());
                 if (h < 0) return;
-                if (h < 6) Sidebar.this.onNav.accept(h);
+                if (h < NAV) Sidebar.this.onNav.accept(h);
                 else if (h == 10) Sidebar.this.onNew.run();
                 else if (h == 11) Sidebar.this.onTheme.run();
                 else if (h == 12) setCollapsed(!Sidebar.this.collapsed, true);
@@ -70,7 +70,7 @@ public class Sidebar extends JComponent {
     public boolean isCollapsed() { return collapsed; }
 
     private int at(int y) {
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < NAV; i++) {
             int top = NAV_Y + i * (ITEM_H + GAP);
             if (y >= top && y < top + ITEM_H) return i;
         }
@@ -87,7 +87,7 @@ public class Sidebar extends JComponent {
     public String getToolTipText(MouseEvent e) {
         if (!collapsed) return null;
         int h = at(e.getY());
-        if (h >= 0 && h < 6) return LABELS[h];
+        if (h >= 0 && h < NAV) return LABELS[h];
         return h == 10 ? "New task" : h == 11 ? "Toggle theme" : h == 12 ? "Expand sidebar" : null;
     }
 
@@ -102,7 +102,7 @@ public class Sidebar extends JComponent {
         double lp = Math.max(0, Math.min(1, (width.value - COL) / (EXP - COL)));
         float la = (float) Math.max(0, (lp - 0.4) / 0.6);
 
-        g2.drawImage(logo, 21, 30, 34, 34, null);
+        g2.drawImage(AppIcon.cached(68), 21, 30, 34, 34, null);
         if (la > 0.02) {
             Graphics2D t = (Graphics2D) g2.create();
             t.setComposite(AlphaComposite.SrcOver.derive(la));
@@ -115,7 +115,7 @@ public class Sidebar extends JComponent {
         double py = NAV_Y + sel.value * (ITEM_H + GAP);
         g2.setColor(Gfx.alpha(Theme.accent, Theme.dark ? 0.22 : 0.13));
         g2.fill(Gfx.rr(12, py, iw, ITEM_H, 12));
-        for (int i = 0; i < 6; i++) item(g2, 12, NAV_Y + i * (ITEM_H + GAP), iw, LABELS[i], ICONS[i], i == selected, hover == i, la, false);
+        for (int i = 0; i < NAV; i++) item(g2, 12, NAV_Y + i * (ITEM_H + GAP), iw, LABELS[i], ICONS[i], i == selected, hover == i, la, false);
 
         int by = h - 16 - 3 * (ITEM_H + GAP);
         Graphics2D b = (Graphics2D) g2.create();
@@ -133,7 +133,7 @@ public class Sidebar extends JComponent {
             g.setColor(Theme.hover);
             g.fill(Gfx.rr(x, y, w, ITEM_H, 12));
         }
-        Color c = onAccent ? Color.WHITE : active ? Theme.accent : Theme.text2;
+        Color c = onAccent ? Theme.onAccent : active ? Theme.accent : Theme.text2;
         Icons.paint(g, icon, x + 14, y + (ITEM_H - 20) / 2.0, 20, c);
         if (la > 0.02) {
             Graphics2D t = (Graphics2D) g.create();
@@ -141,7 +141,7 @@ public class Sidebar extends JComponent {
             t.clipRect(x, y, w, ITEM_H);
             FontMetrics fm = t.getFontMetrics(Theme.semi(14f));
             Gfx.text(t, label, x + 48, y + (ITEM_H - fm.getHeight()) / 2 + fm.getAscent(), active || onAccent ? Theme.semi(14f) : Theme.font(14f),
-                    onAccent ? Color.WHITE : active ? Theme.accent : Theme.text);
+                    onAccent ? Theme.onAccent : active ? Theme.accent : Theme.text);
             t.dispose();
         }
     }

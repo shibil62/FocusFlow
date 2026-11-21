@@ -41,7 +41,7 @@ public class AgendaPanel extends JPanel {
             List<Task> day = new ArrayList<>();
             for (Task t : tasks) {
                 if (overdue.contains(t)) continue;
-                boolean on = t.start != null ? t.coversDay(d) : t.deadline != null && d.equals(t.deadlineDate());
+                boolean on = t.showsOn(d) || t.showsAsDueOn(d);
                 if (on) day.add(t);
             }
             if (day.isEmpty()) continue;

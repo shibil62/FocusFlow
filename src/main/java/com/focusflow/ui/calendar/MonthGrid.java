@@ -114,8 +114,9 @@ public class MonthGrid extends JComponent {
             if (t.start != null) {
                 LocalDate s = t.scheduledDate(), e = t.lastDay();
                 for (LocalDate d = s; !d.isAfter(e) && !d.isAfter(s.plusDays(90)); d = d.plusDays(1)) {
-                    byDay.computeIfAbsent(d, k -> new ArrayList<>()).add(t);
+                    if (t.showsOn(d)) byDay.computeIfAbsent(d, k -> new ArrayList<>()).add(t);
                 }
+                if (t.showsAsDueOn(t.deadlineDate())) byDay.computeIfAbsent(t.deadlineDate(), k -> new ArrayList<>()).add(t);
             } else if (t.deadline != null) {
                 byDay.computeIfAbsent(t.deadlineDate(), k -> new ArrayList<>()).add(t);
             }
@@ -179,7 +180,7 @@ public class MonthGrid extends JComponent {
                     g2.fill(new java.awt.geom.Ellipse2D.Double(x + 8, y + 4, 24, 24));
                 }
                 Gfx.textCentered(g2, String.valueOf(d.getDayOfMonth()), x + 20, y + 16, Theme.semi(12f),
-                        isToday ? Color.WHITE : inMonth ? Theme.text : Theme.text3);
+                        isToday ? Theme.onAccent : inMonth ? Theme.text : Theme.text3);
                 hits.add(new Hit(num, null, d, 2));
                 List<Task> list = byDay.getOrDefault(d, List.of());
                 int slots = Math.max(0, (rhi - 34) / 21);

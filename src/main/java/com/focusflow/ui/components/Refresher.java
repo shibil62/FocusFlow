@@ -18,10 +18,16 @@ public final class Refresher {
         debounce.setRepeats(false);
         Runnable trigger = () -> { if (view.isShowing()) debounce.restart(); };
         for (Notifier n : sources) n.addListener(trigger);
+        Timer clock = new Timer(30_000, e -> { if (view.isShowing()) refresh.run(); });
+        Janitor.add(() -> {
+            debounce.stop();
+            clock.stop();
+            for (Notifier n : sources) n.removeListener(trigger);
+        });
         view.addHierarchyListener(e -> {
             if ((e.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) != 0 && view.isShowing()) debounce.restart();
         });
-        new Timer(30_000, e -> { if (view.isShowing()) refresh.run(); }).start();
+        clock.start();
     }
 
     public static JScrollPane scroll(JComponent c) {

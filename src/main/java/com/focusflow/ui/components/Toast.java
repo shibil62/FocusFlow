@@ -107,14 +107,14 @@ public final class Toast {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = Gfx.aa(g);
             int w = getWidth(), h = getHeight();
-            g2.setColor(Theme.dark ? new Color(0x48484A) : new Color(0x2C2C2E));
+            g2.setColor(Theme.dark ? Gfx.mix(Theme.surface, Theme.text, 0.20) : Gfx.mix(Theme.text, Theme.bg, 0.12));
             g2.fill(Gfx.rr(0, 0, w, h, h));
             FontMetrics fm = g2.getFontMetrics(Theme.font(13f));
             int maxText = w - 40 - (actionLabel != null ? actionW + 24 : 0);
             Gfx.text(g2, Gfx.fit(message, fm, maxText), 20, (h - fm.getHeight()) / 2 + fm.getAscent(), Theme.font(13f), Color.WHITE);
             if (actionLabel != null) {
                 actionX = w - 20 - actionW;
-                Gfx.text(g2, actionLabel, actionX, (h - fm.getHeight()) / 2 + fm.getAscent(), Theme.semi(13f), new Color(0x64B5FF));
+                Gfx.text(g2, actionLabel, actionX, (h - fm.getHeight()) / 2 + fm.getAscent(), Theme.semi(13f), Gfx.mix(Theme.accent, Color.WHITE, 0.40));
             }
             g2.dispose();
         }

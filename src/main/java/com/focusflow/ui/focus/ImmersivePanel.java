@@ -27,6 +27,7 @@ public class ImmersivePanel extends JComponent {
     private final SpringValue done = new SpringValue(0, 0.7, 0.6, this::repaint);
     private final SpringValue burst = new SpringValue(0, 1.1, 1.0, this::repaint);
     private final Timer ticker = new Timer(50, e -> repaint());
+    { com.focusflow.ui.components.Janitor.add(ticker::stop); }
     private BufferedImage ambient;
     private long ambientAt;
     private FocusService.State lastState = FocusService.State.IDLE;
@@ -119,9 +120,9 @@ public class ImmersivePanel extends JComponent {
             a.setColor(BG);
             a.fillRect(0, 0, aw, ah);
             double t = Animator.reduceMotion ? 0 : now / 9000.0;
-            blob(a, aw * (0.30 + 0.12 * Math.sin(t)), ah * (0.35 + 0.10 * Math.cos(t * 1.3)), aw * 0.55, new Color(0x0A84FF), 0.30);
-            blob(a, aw * (0.75 + 0.10 * Math.cos(t * 0.8)), ah * (0.70 + 0.10 * Math.sin(t * 1.1)), aw * 0.50, new Color(0x5E5CE6), 0.28);
-            blob(a, aw * (0.55 + 0.08 * Math.sin(t * 1.6)), ah * (0.15 + 0.08 * Math.cos(t)), aw * 0.35, new Color(0x40C8E0), 0.14);
+            blob(a, aw * (0.30 + 0.12 * Math.sin(t)), ah * (0.35 + 0.10 * Math.cos(t * 1.3)), aw * 0.55, Theme.accent, 0.30);
+            blob(a, aw * (0.75 + 0.10 * Math.cos(t * 0.8)), ah * (0.70 + 0.10 * Math.sin(t * 1.1)), aw * 0.50, Theme.accent2, 0.28);
+            blob(a, aw * (0.55 + 0.08 * Math.sin(t * 1.6)), ah * (0.15 + 0.08 * Math.cos(t)), aw * 0.35, Theme.accent3, 0.14);
             a.dispose();
         }
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -163,7 +164,7 @@ public class ImmersivePanel extends JComponent {
         g2.setStroke(new BasicStroke((float) sw, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2.setColor(new Color(255, 255, 255, 26));
         g2.draw(new Ellipse2D.Double(rx, ry, d, d));
-        Color ring = fin ? new Color(0x30D158) : paused ? new Color(255, 255, 255, 120) : new Color(0x64B5FF);
+        Color ring = fin ? new Color(0x30D158) : paused ? new Color(255, 255, 255, 120) : Gfx.mix(Theme.accent, Color.WHITE, 0.35);
         if (prog > 0.001) {
             g2.setStroke(new BasicStroke((float) (sw * 2.6), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.setColor(Gfx.alpha(ring, 0.12));
@@ -245,10 +246,9 @@ public class ImmersivePanel extends JComponent {
     private void button(Graphics2D g, int idx, double x, double y, double w, double hgt, String label, boolean primary) {
         hit[idx].setBounds((int) x, (int) y, (int) w, (int) hgt);
         boolean hv = hover == idx;
-        g.setColor(primary ? new Color(0x0A84FF).brighter() : new Color(255, 255, 255, hv ? 56 : 30));
-        if (primary && hv) g.setColor(new Color(0x409CFF));
-        else if (primary) g.setColor(new Color(0x0A84FF));
+        g.setColor(primary ? Theme.accent : new Color(255, 255, 255, hv ? 56 : 30));
+        if (primary && hv) g.setColor(Gfx.mix(Theme.accent, Color.WHITE, 0.18));
         g.fill(Gfx.rr(x, y, w, hgt, hgt));
-        Gfx.textCentered(g, label, x + w / 2, y + hgt / 2, Theme.semi(15f), Color.WHITE);
+        Gfx.textCentered(g, label, x + w / 2, y + hgt / 2, Theme.semi(15f), primary ? Theme.onAccent : Color.WHITE);
     }
 }

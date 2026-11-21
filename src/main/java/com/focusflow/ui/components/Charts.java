@@ -37,7 +37,7 @@ public final class Charts {
         int w = fm.stringWidth(text) + 20, h = 26;
         double x = Math.max(4, Math.min(maxW - w - 4, cx - w / 2.0));
         double y = Math.max(2, top - h - 8);
-        g.setColor(Theme.dark ? new Color(0x48484A) : new Color(0x2C2C2E));
+        g.setColor(Theme.dark ? Gfx.mix(Theme.surface, Theme.text, 0.20) : Gfx.mix(Theme.text, Theme.bg, 0.12));
         g.fill(Gfx.rr(x, y, w, h, 10));
         Gfx.text(g, text, (int) x + 10, (int) y + (h - fm.getHeight()) / 2 + fm.getAscent(), f, Color.WHITE);
     }

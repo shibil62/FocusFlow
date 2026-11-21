@@ -11,5 +11,5 @@ if not exist "target\focusflow.jar" (
     exit /b 1
   )
 )
-start "" javaw -Xms64m -Xmx384m -jar "target\focusflow.jar"
+start "" javaw -Xms16m -Xmx192m -XX:+UseSerialGC -XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=15 -XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=32m -XX:MaxMetaspaceSize=96m -Xss512k -XX:-UsePerfData -Dsun.java2d.d3d=false -jar "target\focusflow.jar"
 endlocal

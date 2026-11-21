@@ -15,7 +15,7 @@ public final class Database {
 
     public interface SqlWork<T> { T run(Connection c) throws SQLException; }
 
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static Connection conn;
     private static Path path;
 
@@ -113,6 +113,8 @@ public final class Database {
         if (v < 1) applyV1();
         if (v >= 1 && v < 2) safetyCopyBeforeV2();
         if (v < 2) applyV2();
+        if (v >= 2 && v < 3) safetyCopyBeforeV3();
+        if (v < 3) applyV3();
         // Future versions: if (v < 3) applyV3(); ...
     }
 
@@ -125,6 +127,36 @@ public final class Database {
                 st.execute("VACUUM INTO '" + bak.toAbsolutePath().toString().replace("'", "''") + "'");
             }
         } catch (Exception ignored) { }
+    }
+
+    /** One-time safety copy of an existing database, made right before the v3 upgrade touches it. */
+    private static void safetyCopyBeforeV3() {
+        try {
+            Path bak = path.resolveSibling("focusflow-before-widget-update.db");
+            if (Files.exists(bak)) return;
+            try (Statement st = conn.createStatement()) {
+                st.execute("VACUUM INTO '" + bak.toAbsolutePath().toString().replace("'", "''") + "'");
+            }
+        } catch (Exception ignored) { }
+    }
+
+    /** v3: adds "date-only deadline". Existing rows keep working: the new column defaults to 0 (a normal timed deadline). */
+    private static void applyV3() throws SQLException {
+        conn.setAutoCommit(false);
+        try (Statement s = conn.createStatement()) {
+            boolean has = false;
+            try (ResultSet rs = s.executeQuery("PRAGMA table_info(tasks)")) {
+                while (rs.next()) if ("deadline_all_day".equalsIgnoreCase(rs.getString("name"))) has = true;
+            }
+            if (!has) s.execute("ALTER TABLE tasks ADD COLUMN deadline_all_day INTEGER NOT NULL DEFAULT 0");
+            s.execute("PRAGMA user_version = 3");
+            conn.commit();
+        } catch (SQLException e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
+        }
     }
 
     /** v2: adds a per-task colour. Existing rows are untouched (colour stays NULL until the user picks one). */

@@ -93,7 +93,7 @@ rem It allows newer versions to replace older installations.
 jpackage ^
   --type exe ^
   --name FocusFlow ^
-  --app-version 1.1.0 ^
+  --app-version 1.2.0 ^
   --vendor "Shibil" ^
   --description "Personal productivity and calendar" ^
   --input build\input ^
@@ -116,15 +116,15 @@ rem ============================================================
 rem Verify installer was created
 rem ============================================================
 
-if not exist "dist\FocusFlow-1.1.0.exe" (
+if not exist "dist\FocusFlow-1.2.0.exe" (
     echo.
     echo ERROR: jpackage finished but the installer was not created.
     echo Expected:
-    echo   dist\FocusFlow-1.1.0.exe
+    echo   dist\FocusFlow-1.2.0.exe
     goto fail
 )
 
-move /y "dist\FocusFlow-1.1.0.exe" "dist\FocusFlow.exe" >nul
+move /y "dist\FocusFlow-1.2.0.exe" "dist\FocusFlow.exe" >nul
 
 echo.
 echo ============================================

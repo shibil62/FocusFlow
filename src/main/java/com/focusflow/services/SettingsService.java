@@ -30,6 +30,16 @@ public class SettingsService extends Notifier {
     public static final String ROLLOVER_DISMISSED = "rollover.dismissedOn";
     public static final String FOCUS_LAST_MINUTES = "focus.lastMinutes";
     public static final String FOCUS_ACTIVE = "focus.active";
+    public static final String ACCENT = "appearance.accent";
+    public static final String APP_PALETTE = "appearance.palette";
+    public static final String WIDGET_ENABLED = "widget.enabled";
+    public static final String WIDGET_PALETTE = "widget.palette";
+    public static final String WIDGET_W = "widget.w";
+    public static final String WIDGET_H = "widget.h";
+    public static final String WIDGET_OPACITY = "widget.opacity";
+    public static final String WIDGET_ON_TOP = "widget.onTop";
+    public static final String WIDGET_X = "widget.x";
+    public static final String WIDGET_Y = "widget.y";
 
     private final SettingsRepository repo;
     private final Map<String, String> map = new ConcurrentHashMap<>();

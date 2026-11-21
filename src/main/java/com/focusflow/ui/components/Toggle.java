@@ -47,7 +47,7 @@ public class Toggle extends JComponent {
         int w = getWidth(), h = getHeight();
         int y = (h - 28) / 2;
         if (!isEnabled()) g2.setComposite(AlphaComposite.SrcOver.derive(0.4f));
-        Color off = Theme.dark ? new Color(0x3A3A3C) : new Color(0xE5E5EA);
+        Color off = Gfx.mix(Theme.surfaceAlt, Theme.text, Theme.dark ? 0.10 : 0.12);
         g2.setColor(Gfx.mix(off, Theme.success, Math.max(0, Math.min(1, k.value))));
         g2.fill(Gfx.rr(0, y, 46, 28, 28));
         double kx = 2 + 18 * k.value;

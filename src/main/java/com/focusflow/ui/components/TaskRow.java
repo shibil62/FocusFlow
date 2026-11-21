@@ -76,6 +76,8 @@ public class TaskRow extends JComponent {
     private String when() {
         if (task.start == null) {
             if (task.deadline == null) return "Unscheduled";
+            if (task.isDayEvent()) return Time.relativeDay(task.deadlineDate());
+            if (task.isDueDayOnly()) return "Due " + Time.relativeDay(task.deadlineDate()) + " · All day";
             return "Due " + Time.relativeDay(task.deadlineDate()) + ", " + Time.time(task.deadlineDT());
         }
         LocalDate d = task.scheduledDate();

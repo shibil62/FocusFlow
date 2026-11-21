@@ -28,6 +28,8 @@ public class Task {
     public Long end;
     public boolean allDay;
     public Long deadline;
+    /** True when only the due DATE matters (for example an exam day). The stored deadline is then 11:59 PM of that day. */
+    public boolean deadlineAllDay;
     public int estimatedMinutes;
     public Long completedAt;
     public long createdAt;
@@ -52,6 +54,11 @@ public class Task {
     public void setStart(LocalDateTime t) { start = Time.msOrNull(t); }
     public void setEnd(LocalDateTime t) { end = Time.msOrNull(t); }
     public void setDeadline(LocalDateTime t) { deadline = Time.msOrNull(t); }
+    /** Sets a date-only deadline: due all day, ending at 11:59 PM. */
+    public void setDeadlineDay(LocalDate d) {
+        deadline = Time.ms(d.atTime(23, 59));
+        deadlineAllDay = true;
+    }
 
     /**
      * Last day this task is scheduled on. All-day tasks can span days (end = last day); timed tasks can run
@@ -76,6 +83,36 @@ public class Task {
         return s != null && !d.isBefore(s) && !d.isAfter(lastDay());
     }
 
+    /**
+     * Whether the task should be DRAWN on this day. A finished task stops appearing once the day it was
+     * completed is over: finishing a 5-day task on day 2 no longer leaves it on days 3, 4 and 5.
+     * (coversDay still describes the planned span; use this one for calendars and day lists.)
+     */
+    public boolean showsOn(LocalDate d) {
+        LocalDate s = scheduledDate();
+        if (s != null) {
+            if (!coversDay(d)) return false;
+            if (isCompleted() && completedAt != null) {
+                LocalDate done = Time.dt(completedAt).toLocalDate();
+                LocalDate lastShown = done.isBefore(s) ? s : done;
+                return !d.isAfter(lastShown);
+            }
+            return true;
+        }
+        return deadline != null && d.equals(deadlineDate());
+    }
+
+    /** A scheduled task whose date-only deadline falls on a day outside its schedule: shown there as a due-day marker. */
+    public boolean showsAsDueOn(LocalDate d) {
+        return isDueDayOnly() && !isCompleted() && start != null && d.equals(deadlineDate()) && !showsOn(d);
+    }
+
+    /** "Just a date": something that happens on one day (an exam, say). No time, no schedule, nothing to tick off. */
+    public boolean isDayEvent() { return start == null && isDueDayOnly(); }
+
+    /** Date-only deadlines (such as an exam day) are due for the whole day and become an emergency on that day. */
+    public boolean isDueDayOnly() { return deadline != null && deadlineAllDay; }
+
     public int scheduledMinutes() { return isTimed() ? (int) ((end - start) / 60000) : 0; }
 
     public int subtasksDone() {
@@ -94,7 +131,7 @@ public class Task {
         Task t = new Task();
         t.id = id; t.title = title; t.description = description; t.notes = notes;
         t.categoryId = categoryId; t.priority = priority; t.status = status;
-        t.start = start; t.end = end; t.allDay = allDay; t.deadline = deadline;
+        t.start = start; t.end = end; t.allDay = allDay; t.deadline = deadline; t.deadlineAllDay = deadlineAllDay;
         t.estimatedMinutes = estimatedMinutes; t.completedAt = completedAt;
         t.createdAt = createdAt; t.updatedAt = updatedAt; t.archived = archived;
         t.recurrence = recurrence; t.recurrenceParent = recurrenceParent; t.color = color;

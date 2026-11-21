@@ -55,6 +55,9 @@ public final class Sheet extends JPanel {
 
     public static boolean isOpen() { return !OPEN.isEmpty(); }
 
+    /** Forgets open sheets when their window is released. */
+    public static void reset() { OPEN.clear(); }
+
     public static Sheet show(JComponent content, int w, int h) {
         Sheet s = new Sheet(content, w, h);
         JLayeredPane lp = AppContext.frame.getLayeredPane();

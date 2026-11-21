@@ -26,9 +26,9 @@ public final class StartupRegistry {
 
     private static String command() throws Exception {
         String app = System.getProperty("jpackage.app-path");
-        if (app != null && !app.isBlank()) return "\"" + app + "\"";
+        if (app != null && !app.isBlank()) return "\"" + app + "\" --background";
         Path jar = Path.of(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         Path java = Path.of(System.getProperty("java.home"), "bin", "javaw.exe");
-        return "\"" + java + "\" -jar \"" + jar + "\"";
+        return "\"" + java + "\" -jar \"" + jar + "\" --background";
     }
 }

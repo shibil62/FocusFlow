@@ -8,6 +8,7 @@ import com.focusflow.ui.Theme;
 import com.focusflow.ui.components.*;
 import com.focusflow.utilities.Gfx;
 import com.focusflow.utilities.StartupRegistry;
+import com.focusflow.widget.WidgetPalette;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -36,7 +37,35 @@ public class SettingsView extends JPanel {
         page.add(group("Appearance",
                 row("Theme", "Light or dark. Switches smoothly.", new Segmented(new String[]{"Light", "Dark"}, Theme.dark ? 1 : 0,
                         i -> AppContext.frame.setDark(i == 1))),
+                row("Colour theme", "Matches the desktop widget colours. \"Classic\" is the plain light or dark look.", themeChoice()),
+                row("Accent colour", "For the Classic theme. Other themes bring their own.", accentChoice()),
                 row("Reduce motion", "Replaces slides and springs with quick fades.", toggle(SettingsService.REDUCE_MOTION, false, v -> com.focusflow.animations.Animator.reduceMotion = v))), 16);
+
+        Btn resetPos = new Btn("Reset position", Btn.Kind.TINTED);
+        resetPos.addActionListener(e -> {
+            s.removeQuiet(SettingsService.WIDGET_X);
+            s.removeQuiet(SettingsService.WIDGET_Y);
+            com.focusflow.widget.WidgetController.setEnabled(false);
+            com.focusflow.widget.WidgetController.setEnabled(true);
+            Toast.show("Widget moved back to the top right");
+        });
+        Btn resetSize = new Btn("Reset size", Btn.Kind.TINTED);
+        resetSize.addActionListener(e -> {
+            s.removeQuiet(SettingsService.WIDGET_W);
+            s.removeQuiet(SettingsService.WIDGET_H);
+            com.focusflow.widget.WidgetController.sync();
+            Toast.show("Widget size reset");
+        });
+        JPanel posBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        posBtns.setOpaque(false);
+        posBtns.add(resetSize);
+        posBtns.add(resetPos);
+        page.add(group("Desktop widget",
+                note("A small calendar that lives on your Windows desktop, below your apps (it never covers them). Point at a date to zoom in on it and see its tasks as bubbles. Drag any edge or corner to resize it: the smaller it gets, the fewer details it shows. Right-click it for quick options."),
+                row("Show the widget", "Also in the tray icon menu", toggle(SettingsService.WIDGET_ENABLED, true, null)),
+                row("Widget colour", "Pick a look, or follow the app", widgetPalette()),
+                row("Solidity", "Lower is more see-through", number(SettingsService.WIDGET_OPACITY, 92, 35, 100, 5, "0'%'")),
+                row("Position and size", "Drag the widget to move it, drag its edges to resize it", posBtns)), 16);
 
         page.add(group("Deadline intelligence",
                 note("An urgency level is picked from the time left. The score also weighs workload and priority, and can raise the level."),
@@ -83,15 +112,15 @@ public class SettingsView extends JPanel {
                 note("Restoring first saves a copy of your current data, so nothing is lost by accident.")), 16);
 
         page.add(group("System",
-                row("Launch at Windows startup", StartupRegistry.supported() ? "Opens FocusFlow when you sign in" : "Only available on Windows",
+                row("Launch at Windows startup", StartupRegistry.supported() ? "Puts the widget on your desktop when you sign in (the window stays closed)" : "Only available on Windows",
                         startupToggle()),
                 row("Keep running in the tray", "Closing the window hides it so reminders keep working", toggle(SettingsService.CLOSE_TO_TRAY, false, null)),
                 row("Start maximized", "", toggle(SettingsService.START_MAXIMIZED, false, null))), 16);
 
         page.add(group("Keyboard shortcuts",
                 note("Ctrl+N new task    Ctrl+K search    Ctrl+T today    Ctrl+Z undo    Ctrl+D dark mode    Ctrl+B sidebar\n"
-                        + "Ctrl+1 to 6 switch sections    Ctrl+, settings    Left/Right arrows move around the calendar    Space pauses the timer")), 16);
-        page.add(note("FocusFlow 1.0  ·  Local-first. No account, no cloud, no tracking."), 18);
+                        + "Ctrl+1 to 7 switch sections    Ctrl+, settings    F1 help    Left/Right arrows move around the calendar    Space pauses the timer")), 16);
+        page.add(note(com.focusflow.app.AppInfo.NAME + " " + com.focusflow.app.AppInfo.VERSION + "  ·  Made by " + com.focusflow.app.AppInfo.CREATOR + "  ·  Local-first. No account, no cloud, no tracking."), 18);
 
         add(Refresher.scroll(page), BorderLayout.CENTER);
         Refresher.install(this, this::rebuildCategories, AppContext.categories);
@@ -156,6 +185,50 @@ public class SettingsView extends JPanel {
             s.set(key, v);
         });
         return sp;
+    }
+
+    private JComponent themeChoice() {
+        java.util.List<String> names = new java.util.ArrayList<>(WidgetPalette.names());
+        names.remove(WidgetPalette.MATCH_APP);
+        names.add(0, "Classic");
+        Color[] main = new Color[names.size()], second = new Color[names.size()];
+        int sel = 0;
+        for (int i = 0; i < main.length; i++) {
+            if (i == 0) { main[i] = new Color(0xF5F5F7); second[i] = new Color(0x1C1C1E); }
+            else {
+                WidgetPalette.Palette p = WidgetPalette.get(names.get(i));
+                main[i] = p.bg();
+                second[i] = p.accent();
+            }
+            if ((i == 0 && Theme.paletteName.isEmpty()) || names.get(i).equals(Theme.paletteName)) sel = i;
+        }
+        return new ColorChoice(names.toArray(new String[0]), main, second, sel,
+                i -> AppContext.frame.setPalette(i == 0 ? "" : names.get(i)));
+    }
+
+    private JComponent accentChoice() {
+        String[] names = Theme.ACCENT_NAMES;
+        Color[] cols = new Color[names.length];
+        int sel = 0;
+        for (int i = 0; i < names.length; i++) {
+            cols[i] = Theme.accentColor(names[i], Theme.dark);
+            if (names[i].equals(Theme.accentName)) sel = i;
+        }
+        return new ColorChoice(names, cols, null, sel, i -> AppContext.frame.setAccent(names[i]));
+    }
+
+    private JComponent widgetPalette() {
+        java.util.List<String> names = WidgetPalette.names();
+        Color[] bg = new Color[names.size()], ac = new Color[names.size()];
+        String cur = s.get(SettingsService.WIDGET_PALETTE, "Midnight");
+        int sel = 0;
+        for (int i = 0; i < bg.length; i++) {
+            WidgetPalette.Palette p = WidgetPalette.get(names.get(i));
+            bg[i] = p.bg();
+            ac[i] = p.accent();
+            if (names.get(i).equals(cur)) sel = i;
+        }
+        return new ColorChoice(names.toArray(new String[0]), bg, ac, sel, i -> s.set(SettingsService.WIDGET_PALETTE, names.get(i)));
     }
 
     private Toggle startupToggle() {
